@@ -36,6 +36,8 @@ CONF_ENTRY_AUTH_OPENID = "open_id"
 HASS_DATA_AUTH_ENTRY_ID = "auth_entry_id"
 HASS_DATA_AIOTCLOUD = "aiotcloud"
 HASS_DATA_AIOT_MANAGER = "aiot_manager"
+HASS_DATA_TOKEN_STORE = "token_store"
+HASS_DATA_REFRESH_TIMER = "refresh_timer"
 
 ATTR_FIRMWARE_VERSION = "firmware_version"
 ATTR_ZIGBEE_LQI = "zigbee_lqi"

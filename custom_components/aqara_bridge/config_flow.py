@@ -70,7 +70,7 @@ class AqaraBridgeFlowHandler(ConfigFlow, domain=DOMAIN):
                         self.account, self.account_type, self.country_code,
                         resp["result"],
                     )
-                    self.hass.async_add_job(
+                    self.hass.async_create_task(
                         self.hass.config_entries.flow.async_init(
                             DOMAIN, context={"source": "get_token"}, data=auth_entry
                         )
@@ -122,7 +122,7 @@ class AqaraBridgeFlowHandler(ConfigFlow, domain=DOMAIN):
                         self.account, self.account_type, self.country_code,
                         resp["result"],
                     )
-                    self.hass.async_add_job(
+                    self.hass.async_create_task(
                         self.hass.config_entries.flow.async_init(
                             DOMAIN, context={"source": "get_token"}, data=auth_entry
                         )

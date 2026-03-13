@@ -352,13 +352,13 @@ AIOT_DEVICE_MAPPING = [
                     MK_HASS_NAME: "light",
                     "color_mode": ColorMode.XY,  # 写hs为rgb模式 xy为色温模式
                     "supported_color_mode": [ColorMode.BRIGHTNESS, ColorMode.COLOR_TEMP],
-                    "min_mireds": 153,
-                    "max_mireds": 370
+                    "min_color_temp_kelvin": 2703,
+                    "max_color_temp_kelvin": 6536
                 },
                 MK_RESOURCES: {
                     "toggle": ("4.1.85", "_attr_is_on"),
                     "brightness": ("14.1.85", "_attr_brightness"),
-                    "color_temp": ("14.2.85", "_attr_color_temp"),
+                    "color_temp": ("14.2.85", "_attr_color_temp_kelvin"),
                     "zigbee_lqi": ("8.0.2007", "_attr_zigbee_lqi"),
                 }
             }
@@ -380,7 +380,7 @@ AIOT_DEVICE_MAPPING = [
                 MK_RESOURCES: {
                     "toggle": ("4.1.85", "_attr_is_on"),
                     "brightness": ("1.7.85", "_attr_brightness"),
-                    "color_temp": ("1.9.85", "_attr_color_temp"),
+                    "color_temp": ("1.9.85", "_attr_color_temp_kelvin"),
                     "zigbee_lqi": ("8.0.2007", "_attr_zigbee_lqi"),
                 }
             }
@@ -402,7 +402,7 @@ AIOT_DEVICE_MAPPING = [
                 MK_RESOURCES: {
                     "toggle": ("4.1.85", "_attr_is_on"),
                     "brightness": ("14.1.85", "_attr_brightness"),
-                    "color_temp": ("14.2.85", "_attr_color_temp"),
+                    "color_temp": ("14.2.85", "_attr_color_temp_kelvin"),
                     "color": ("14.8.85", "_attr_hs_color"),
                     "zigbee_lqi": ("8.0.2007", "_attr_zigbee_lqi"),
                 }
@@ -422,13 +422,13 @@ AIOT_DEVICE_MAPPING = [
                     # 颜色模式XY转换有问题，无法根据云端值拆分计算
                     "color_mode": ColorMode.XY,  #写hs为rgb模式 xy为色温模式
                     "supported_color_mode": [ColorMode.BRIGHTNESS, ColorMode.COLOR_TEMP],
-                    "min_mireds": 153,
-                    "max_mireds": 370
+                    "min_color_temp_kelvin": 2703,
+                    "max_color_temp_kelvin": 6536
                 },
                 MK_RESOURCES: {
                     "toggle": ("4.1.85", "_attr_is_on"),
                     "brightness": ("14.1.85", "_attr_brightness"),
-                    "color_temp": ("14.2.85", "_attr_color_temp"),
+                    "color_temp": ("14.2.85", "_attr_color_temp_kelvin"),
                     "color": ("14.8.85", "_attr_hs_color"),
                     "zigbee_lqi": ("8.0.2007", "_attr_zigbee_lqi")
                 }
@@ -457,13 +457,13 @@ AIOT_DEVICE_MAPPING = [
                     # 颜色模式XY转换有问题，无法根据云端值拆分计算
                     "color_mode": ColorMode.XY,  #写hs为rgb模式 xy为色温模式
                     "supported_color_mode": [ColorMode.BRIGHTNESS, ColorMode.COLOR_TEMP],
-                    "min_mireds": 153,
-                    "max_mireds": 370
+                    "min_color_temp_kelvin": 2703,
+                    "max_color_temp_kelvin": 6536
                 },
                 MK_RESOURCES: {
                     "toggle": ("4.1.85", "_attr_is_on"),
                     "brightness": ("14.1.85", "_attr_brightness"),
-                    "color_temp": ("14.2.85", "_attr_color_temp"),
+                    "color_temp": ("14.2.85", "_attr_color_temp_kelvin"),
                     "zigbee_lqi": ("8.0.2007", "_attr_zigbee_lqi")
                 }
             }

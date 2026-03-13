@@ -1,6 +1,5 @@
 """ Aqara Bridge remote """
 import asyncio
-import time
 import voluptuous as vol
 from datetime import datetime
 from homeassistant.helpers import config_validation as cv
@@ -86,7 +85,7 @@ class AiotRemoteIrda(AiotEntityBase, RemoteEntity):
 
         for _ in range(num_repeats):
             await self.async_set_resource("irda", command)
-            time.sleep(delay)
+            await asyncio.sleep(delay)
 
     async def async_learn_command(self, **kwargs):
         """Handle a learn command."""
@@ -104,8 +103,9 @@ class AiotRemoteIrda(AiotEntityBase, RemoteEntity):
 
                 if isinstance(message, dict):
                     log_msg = "Received command is: {}".format(message['ircode'])
-                    self.hass.components.persistent_notification.async_create(
-                        log_msg, title="Aqara Remote"
+                    await self.hass.services.async_call(
+                        "persistent_notification", "create",
+                        {"message": log_msg, "title": "Aqara Remote"}
                     )
                     return
 

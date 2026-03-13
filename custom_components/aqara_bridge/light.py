@@ -2,6 +2,12 @@ import logging
 import homeassistant.util.color as color_util
 from homeassistant.components.light import LightEntity
 
+try:
+    from homeassistant.components.light import ATTR_COLOR_TEMP_KELVIN
+    USE_KELVIN = True
+except ImportError:
+    USE_KELVIN = False
+
 from .core.aiot_manager import (
     AiotManager,
     AiotToggleableEntityBase,
@@ -9,6 +15,15 @@ from .core.aiot_manager import (
 from .core.const import DOMAIN, HASS_DATA_AIOT_MANAGER
 
 TYPE = "light"
+MIREDS_KELVIN_FACTOR = 1_000_000
+
+
+def _kelvin_to_mireds(kelvin):
+    return int(MIREDS_KELVIN_FACTOR / kelvin)
+
+
+def _mireds_to_kelvin(mireds):
+    return int(MIREDS_KELVIN_FACTOR / mireds)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -31,9 +46,15 @@ class AiotLightEntity(AiotToggleableEntityBase, LightEntity):
             self, hass, device, res_params, TYPE, channel, **kwargs
         )
         self._attr_color_mode = kwargs.get("color_mode")
-        self._attr_min_mireds = kwargs.get("min_mireds")
-        self._attr_max_mireds = kwargs.get("max_mireds")
-        self._extra_state_attributes.extend(["trigger_time", "trigger_dt" , "color_mode", "min_mireds", "max_mireds"])
+        if USE_KELVIN:
+            self._attr_min_color_temp_kelvin = kwargs.get("min_color_temp_kelvin")
+            self._attr_max_color_temp_kelvin = kwargs.get("max_color_temp_kelvin")
+        else:
+            min_k = kwargs.get("min_color_temp_kelvin")
+            max_k = kwargs.get("max_color_temp_kelvin")
+            self._attr_min_mireds = _kelvin_to_mireds(max_k) if max_k else None
+            self._attr_max_mireds = _kelvin_to_mireds(min_k) if min_k else None
+        self._extra_state_attributes.extend(["trigger_time", "trigger_dt", "color_mode"])
 
     async def async_turn_on(self, **kwargs):
         """Turn the specified light on."""
@@ -48,9 +69,14 @@ class AiotLightEntity(AiotToggleableEntityBase, LightEntity):
         if brightness:
             await self.async_set_resource("brightness", brightness)
 
-        color_temp = kwargs.get("color_temp")
-        if color_temp:
-            await self.async_set_resource("color_temp", color_temp)
+        color_temp_kelvin = kwargs.get("color_temp_kelvin")
+        if color_temp_kelvin:
+            await self.async_set_resource("color_temp", color_temp_kelvin)
+        else:
+            color_temp = kwargs.get("color_temp")
+            if color_temp:
+                # Legacy mireds path: convert to kelvin for resource handler
+                await self.async_set_resource("color_temp", _mireds_to_kelvin(color_temp))
 
         await super().async_turn_on(**kwargs)
 
@@ -73,8 +99,8 @@ class AiotLightEntity(AiotToggleableEntityBase, LightEntity):
         elif res_name == "color" and self._attr_color_mode == "xy":
             return
         elif res_name == "color_temp":
-            # attr_value：color temp
-            return int(attr_value)
+            # attr_value is kelvin, cloud expects mireds
+            return _kelvin_to_mireds(attr_value)
         return super().convert_attr_to_res(res_name, attr_value)
 
     def convert_res_to_attr(self, res_name, res_value):
@@ -90,6 +116,6 @@ class AiotLightEntity(AiotToggleableEntityBase, LightEntity):
         elif res_name == "color" and self._attr_color_mode == "xy":
             return
         elif res_name == "color_temp":
-            # res_value：153-500
-            return int(res_value)
+            # res_value from cloud is mireds (153-500), convert to kelvin
+            return _mireds_to_kelvin(int(res_value))
         return super().convert_res_to_attr(res_name, res_value)

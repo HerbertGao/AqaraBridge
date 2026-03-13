@@ -348,7 +348,6 @@ class AiotMessageHandler:
 
     def start(self, callback):
         def consumer_callback(msg: RecvMessage):
-            asyncio.set_event_loop(self._loop)
             asyncio.run_coroutine_threadsafe(
                 callback(json.loads(str(msg.body, "utf-8"))),
                 self._loop,
@@ -419,7 +418,7 @@ class AiotManager:
         return devices
 
     def start_msg_hanlder(self, app_id, app_key, key_id):
-        self._msg_handler = AiotMessageHandler(asyncio.get_event_loop(), app_id, app_key, key_id)
+        self._msg_handler = AiotMessageHandler(self._hass.loop, app_id, app_key, key_id)
         self._msg_handler.start(self._msg_callback)
 
     async def _msg_callback(self, msg):
@@ -438,7 +437,7 @@ class AiotManager:
                                 is_support = True
                                 await entity.async_set_attr(x["resourceId"], x["value"], x["time"])
                         if not is_support:
-                            _LOGGER.warn("[msg_callback, unsupport_resources]{}, {}, {}:{}".format(
+                            _LOGGER.warning("[msg_callback, unsupport_resources]{}, {}, {}:{}".format(
                                 ts_format_str_ms(x["time"], self._hass), x["subjectId"], x["resourceId"], x["value"]))
                     else:
                         _LOGGER.info("[msg_callback, not_in_devices_entities]{}, {}".format(ts_format_str_ms(x["time"], self._hass), x))
@@ -464,7 +463,7 @@ class AiotManager:
                 else:  # 其他事件暂不处理
                     pass
             else:
-                _LOGGER.warn("[msg_callback, {}]msg_time:{}, msg_data:{}".format("unknow_message", msg_time, msg['data']))
+                _LOGGER.warning("[msg_callback, {}]msg_time:{}, msg_data:{}".format("unknow_message", msg_time, msg['data']))
         except Exception as _:
             _LOGGER.exception("[msg_callback, error]process_message_error.\n")
 
@@ -472,11 +471,25 @@ class AiotManager:
         """获取Aiot所有设备"""
         self._all_devices = {}
         results = await self._session.async_query_all_devices_info()
+        # Build devices and collect unique position IDs
+        devices = []
+        position_ids = set()
         for x in results:
             device = AiotDevice(**x)
-            postions = await self._session.async_query_position_detail([device.position_id])
-            device.position_name = postions[0]['positionName']
-            self._all_devices.setdefault(x["did"], device)
+            devices.append((x["did"], device))
+            if device.position_id:
+                position_ids.add(device.position_id)
+        # Batch query all positions at once
+        position_map = {}
+        if position_ids:
+            positions = await self._session.async_query_position_detail(list(position_ids))
+            if positions:
+                for p in positions:
+                    position_map[p['positionId']] = p['positionName']
+        # Assign position names to devices
+        for did, device in devices:
+            device.position_name = position_map.get(device.position_id)
+            self._all_devices.setdefault(did, device)
 
     async def async_add_all_devices(self, config_entry: ConfigEntry):
         await self.async_refresh_all_devices()  # 刷新一次所有设备列表
@@ -488,7 +501,7 @@ class AiotManager:
                 self._managed_devices[device.did] = device
                 self._entries_devices[config_entry.entry_id].append(device.did)
             else:
-                _LOGGER.warn(f"Aqara device is not supported. Device model is '{device.model}'.")
+                _LOGGER.warning(f"Aqara device is not supported. Device model is '{device.model}'.")
                 continue
 
     async def async_forward_entry_setup(self, config_entry: ConfigEntry):
@@ -499,9 +512,7 @@ class AiotManager:
                 for i in range(len(self._managed_devices[x].platforms)):
                     platforms.extend(self._managed_devices[x].platforms[i].keys())
         
-        self._hass.async_create_task(
-                self._hass.config_entries.async_forward_entry_setups(config_entry, set(platforms))
-            )
+        await self._hass.config_entries.async_forward_entry_setups(config_entry, set(platforms))
     async def async_add_entities(
         self, config_entry: ConfigEntry, entity_type: str, cls_list, async_add_entities
     ):
@@ -524,7 +535,8 @@ class AiotManager:
                         if entity_type in p:
                             params.append(p[entity_type])
                     break
-            device.resource_names = await self._session.async_query_resource_name([device.did])
+            if not device.resource_names:
+                device.resource_names = await self._session.async_query_resource_name([device.did]) or []
             ch_count = None
             # 这里需要处理特殊设备
             if device.model == "lumi.airrtc.vrfegl01":

@@ -153,7 +153,7 @@ class AiotCloud:
             _LOGGER.error(ex)
 
     async def async_get_auth_code(
-        self, account: str, account_type: int, access_token_validity: str = "7d"
+        self, account: str, account_type: int, access_token_validity: str = "10y"
     ):
         """获取授权验证码"""
         return await self._async_invoke_aqara_cloud_api(
