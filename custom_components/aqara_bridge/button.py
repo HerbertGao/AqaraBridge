@@ -35,7 +35,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
 class AiotButtonEntity(AiotEntityBase, SensorEntity):
     def __init__(self, hass, device, res_params, channel=None, **kwargs):
         AiotEntityBase.__init__(self, hass, device, res_params, TYPE, channel, **kwargs)
-        self._attr_state_class = kwargs.get("state_class")
+        self._attr_state_class = kwargs.get("state_class") or None
         self._attr_name = f"{self._attr_name} {self._attr_device_class}"
         self._attr_press_type = None
 

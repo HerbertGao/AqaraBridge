@@ -1,8 +1,14 @@
-from homeassistant.components.binary_sensor import *
-from homeassistant.components.cover import *
-from homeassistant.components.light import *
-from homeassistant.components.sensor import *
-from homeassistant.const import *
+from homeassistant.components.binary_sensor import BinarySensorDeviceClass
+from homeassistant.components.cover import CoverDeviceClass
+from homeassistant.components.light import ColorMode
+from homeassistant.components.sensor import SensorDeviceClass
+from homeassistant.const import (
+    LIGHT_LUX,
+    PERCENTAGE,
+    UnitOfEnergy,
+    UnitOfPower,
+    UnitOfTemperature,
+)
 
 # AiotDevice Mapping
 MK_MAPPING_PARAMS = "mapping_params"
@@ -497,7 +503,7 @@ AIOT_DEVICE_MAPPING = [
                 MK_INIT_PARAMS: {
                     MK_HASS_NAME: "action",
                     "device_class": "",
-                    "state_class": "",
+                    "state_class": None,
                     "unit_of_measurement": ""
                 },
                 MK_RESOURCES: {"button": ("13.1.85", "_attr_press_type")},
@@ -523,7 +529,7 @@ AIOT_DEVICE_MAPPING = [
                 MK_INIT_PARAMS: {
                     MK_HASS_NAME: "action",
                     "device_class": "",
-                    "state_class": "",
+                    "state_class": None,
                     "unit_of_measurement": ""
                 },
                 MK_RESOURCES: {"button": ("13.{}.85", "_attr_press_type")},
@@ -542,7 +548,7 @@ AIOT_DEVICE_MAPPING = [
                 MK_INIT_PARAMS: {
                     MK_HASS_NAME: "action",
                     "device_class": "",
-                    "state_class": "",
+                    "state_class": None,
                     "unit_of_measurement": ""
                 },
                 MK_RESOURCES: {"button": ("13.{}.85", "_attr_press_type")},
@@ -561,7 +567,7 @@ AIOT_DEVICE_MAPPING = [
                 MK_INIT_PARAMS: {
                     MK_HASS_NAME: "action",
                     "device_class": "",
-                    "state_class": "",
+                    "state_class": None,
                     "unit_of_measurement": ""
                 },
                 MK_RESOURCES: {"button": ("13.{}.85", "_attr_press_type")},
@@ -580,7 +586,7 @@ AIOT_DEVICE_MAPPING = [
                 MK_INIT_PARAMS: {
                     MK_HASS_NAME: "action",
                     "device_class": "",
-                    "state_class": "",
+                    "state_class": None,
                     "unit_of_measurement": ""
                 },
                 MK_RESOURCES: {"button": ("13.1.85", "_attr_press_type")},
@@ -590,7 +596,7 @@ AIOT_DEVICE_MAPPING = [
                 MK_INIT_PARAMS: {
                     MK_HASS_NAME: "rotation_angle",
                     "device_class": "",
-                    "state_class": "",
+                    "state_class": None,
                     "unit_of_measurement": ""
                 },
                 MK_RESOURCES: {"state": ("0.22.85", "_attr_native_value")},
@@ -600,7 +606,7 @@ AIOT_DEVICE_MAPPING = [
                 MK_INIT_PARAMS: {
                     MK_HASS_NAME: "press_rotation_angle",
                     "device_class": "",
-                    "state_class": "",
+                    "state_class": None,
                     "unit_of_measurement": ""
                 },
                 MK_RESOURCES: {"state": ("0.29.85", "_attr_native_value")},
@@ -796,11 +802,158 @@ AIOT_DEVICE_MAPPING = [
                 MK_INIT_PARAMS: {
                     MK_HASS_NAME: "contact",
                     "device_class": "",
-                    "state_class": "",
+                    "state_class": None,
                     "unit_of_measurement": ""
                 },
                 MK_RESOURCES: {
                     "status": ("13.2.85", "_attr_native_value")
+                },
+            }
+        }
+    ]
+},
+###智能门锁 A100 Pro
+{
+    'aqara.lock.acn001': ["Aqara", "Smart Door Lock A100 Pro", ""],
+    'params': [
+        {
+            "sensor": {
+                MK_INIT_PARAMS: {
+                    MK_HASS_NAME: "lock_state",
+                },
+                MK_RESOURCES: {
+                    "lock_state": ("13.88.85", "_attr_native_value"),
+                    "open_door_method_id": ("13.18.85", "_attr_open_door_method"),
+                    "zigbee_lqi": ("8.0.2007", "_attr_zigbee_lqi"),
+                },
+            }
+        },
+        {
+            "binary_sensor": {
+                MK_INIT_PARAMS: {
+                    MK_HASS_NAME: "door",
+                    "device_class": CoverDeviceClass.DOOR
+                },
+                MK_RESOURCES: {
+                    "door_event": ("13.17.85", "_attr_native_value"),
+                },
+            }
+        }
+    ]
+},
+###窗帘电机 E1
+{
+    'lumi.curtain.acn003': ["Aqara", "Curtain Motor E1", "ZNCLDJ14LM"],
+    'params': [
+        {
+            "cover": {
+                MK_INIT_PARAMS: {
+                    MK_HASS_NAME: "curtain",
+                },
+                MK_RESOURCES: {
+                    "position": ("1.1.85", "_attr_current_cover_position"),
+                    "curtain_status": ("14.4.85", "_attr_curtain_running_status"),
+                    "set_mode": ("14.8.85", "_attr_set_mode"),
+                },
+            }
+        },
+        {
+            "sensor": {
+                MK_INIT_PARAMS: {
+                    MK_HASS_NAME: "battery",
+                    "device_class": SensorDeviceClass.BATTERY,
+                    "state_class": "measurement",
+                    "unit_of_measurement": PERCENTAGE
+                },
+                MK_RESOURCES: {
+                    "battery": ("8.0.2001", "_attr_native_value"),
+                },
+            }
+        }
+    ]
+},
+###魔方控制器
+{
+    'lumi.sensor_cube.aqgl01': ["Aqara", "Magic Cube Controller", "MFKZQ01LM"],
+    'params': [
+        {
+            "sensor": {
+                MK_INIT_PARAMS: {
+                    MK_HASS_NAME: "action",
+                },
+                MK_RESOURCES: {
+                    "cube_status": ("13.1.85", "_attr_native_value"),
+                    "rotate_degree": ("0.3.85", "_attr_rotate_degree"),
+                    "zigbee_lqi": ("8.0.2007", "_attr_zigbee_lqi"),
+                },
+            }
+        }
+    ]
+},
+###空调伴侣P3
+{
+    'lumi.aircondition.acn05': ["Aqara", "Air Conditioning Companion P3", "KTBL12LM"],
+    'params': [
+        {
+            "climate": {
+                MK_INIT_PARAMS: {
+                    MK_HASS_NAME: "climate",
+                    "unit_of_measurement": UnitOfTemperature.CELSIUS,
+                },
+                MK_RESOURCES: {
+                    "ac_zip_status": ("14.32.85", "_attr_ac_zip_status"),
+                    "send_ac_cmd": ("8.0.2116", "_attr_send_ac_cmd"),
+                    "on_off_status": ("3.1.85", "_attr_on_off_status"),
+                    "temperature_value": ("0.1.85", "_attr_current_temperature"),
+                },
+            }
+        },
+        {
+            "sensor": {
+                MK_INIT_PARAMS: {
+                    MK_HASS_NAME: "humidity",
+                    "device_class": SensorDeviceClass.HUMIDITY,
+                    "state_class": "measurement",
+                    "unit_of_measurement": PERCENTAGE
+                },
+                MK_RESOURCES: {
+                    "humidity_value": ("0.2.85", "_attr_native_value"),
+                },
+            }
+        },
+        {
+            "sensor": {
+                MK_INIT_PARAMS: {
+                    MK_HASS_NAME: "power",
+                    "device_class": SensorDeviceClass.POWER,
+                    "state_class": "measurement",
+                    "unit_of_measurement": UnitOfPower.WATT
+                },
+                MK_RESOURCES: {
+                    "ac_load_power": ("0.11.85", "_attr_native_value"),
+                },
+            }
+        },
+        {
+            "sensor": {
+                MK_INIT_PARAMS: {
+                    MK_HASS_NAME: "energy",
+                    "device_class": SensorDeviceClass.ENERGY,
+                    "state_class": "total_increasing",
+                    "unit_of_measurement": UnitOfEnergy.KILO_WATT_HOUR
+                },
+                MK_RESOURCES: {
+                    "cost_energy": ("0.13.85", "_attr_native_value"),
+                },
+            }
+        },
+        {
+            "switch": {
+                MK_INIT_PARAMS: {
+                    MK_HASS_NAME: "relay",
+                },
+                MK_RESOURCES: {
+                    "toggle": ("4.1.85", "_attr_is_on"),
                 },
             }
         }

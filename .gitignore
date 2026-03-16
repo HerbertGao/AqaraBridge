@@ -1,3 +1,15 @@
+# Docker test environment
+docker/
+docker-compose.test.yml
+scripts/
+
+# Claude Code
+.claude/
+
+# OpenSpec (change management)
+openspec/
+
+# HA config directories
 /config
 config2/*
 
