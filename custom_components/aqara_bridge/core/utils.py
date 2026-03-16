@@ -9,15 +9,17 @@ except ImportError:
     from homeassistant.util.dt import DEFAULT_TIME_ZONE
     get_default_time_zone = lambda: DEFAULT_TIME_ZONE
 
+# get_time_zone is sync and works in property/sync contexts.
+# async_get_time_zone is a coroutine in HA 2025.1+ and cannot be used in sync code.
 try:
-    from homeassistant.util.dt import async_get_time_zone
+    from homeassistant.util.dt import get_time_zone
 except ImportError:
-    from homeassistant.util.dt import get_time_zone as async_get_time_zone
+    get_time_zone = None
 
 def local_zone(hass=None):
     try:
-        if isinstance(hass, HomeAssistant):
-            return async_get_time_zone(hass.config.time_zone)
+        if isinstance(hass, HomeAssistant) and get_time_zone is not None:
+            return get_time_zone(hass.config.time_zone)
         return get_default_time_zone()
     except KeyError:
         pass
