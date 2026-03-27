@@ -362,32 +362,26 @@ class AiotMessageHandler:
 
 
 class AiotManager:
-    # Aiot会话
-    _session: AiotCloud = None
-
-    # 所有设备
-    _all_devices: Optional[Union[str, AiotDevice]]  = {}
-
-    # 所有在HA中管理的设备
-    _managed_devices: Optional[Union[str, AiotDevice]] = {}
-
-    # 配置对象和设备的对应关系，1：N
-    _entries_devices: Optional[Union[str, list]] = {}
-
-    # 所有配置对象
-    _config_entries: Optional[Union[str, ConfigEntry]]  = {}
-
-    # 设备和实体的对应关系，1：N
-    _devices_entities: Optional[Union[str, list]] = {}
-
-    # 插件不支持的设备列表
-    _unsupported_devices: Optional[list] = []
 
     def __init__(self, hass: HomeAssistant, session: AiotCloud):
         self._hass = hass
         self._session = session
         self._msg_handler = None
         self._options = None
+        # 所有设备
+        self._all_devices: dict[str, AiotDevice] = {}
+        # 所有在HA中管理的设备
+        self._managed_devices: dict[str, AiotDevice] = {}
+        # 配置对象和设备的对应关系，1：N
+        self._entries_devices: dict[str, list] = {}
+        # 所有配置对象
+        self._config_entries: dict[str, ConfigEntry] = {}
+        # 设备和实体的对应关系，1：N
+        self._devices_entities: dict[str, list] = {}
+        # 插件不支持的设备列表
+        self._unsupported_devices: list = []
+        # 平台回调缓存，用于动态添加实体
+        self._platform_callbacks: dict[str, tuple] = {}
 
     @property
     def session(self) -> AiotCloud:
@@ -444,23 +438,15 @@ class AiotManager:
             elif msg.get("eventType"):
                 _LOGGER.info("[msg_callback, {}]msg_time:{}, msg_data:{}".format(msg.get("eventType"), msg_time, msg['data']))
                 # 事件消息
-                if msg["eventType"] == "gateway_bind":  # 网关绑定
-                    pass
-                elif msg["eventType"] == "subdevice_bind":  # 子设备绑定
-                    pass
-                elif msg["eventType"] == "gateway_unbind":  # 网关解绑
-                    pass
-                elif msg["eventType"] == "unbind_sub_gw":  # 子设备解绑
-                    pass
-                elif msg["eventType"] == "gateway_online":  # 网关在线
-                    pass
-                elif msg["eventType"] == "gateway_offline":  # 网关离线
-                    pass
-                elif msg["eventType"] == "subdevice_online":  # 子设备在线
-                    pass
-                elif msg["eventType"] == "subdevice_offline":  # 子设备离线
-                    pass
-                else:  # 其他事件暂不处理
+                if msg["eventType"] in ("gateway_bind", "subdevice_bind"):
+                    await self._handle_device_bind(msg)
+                elif msg["eventType"] in ("gateway_unbind", "unbind_sub_gw"):
+                    await self._handle_device_unbind(msg)
+                elif msg["eventType"] in ("gateway_online", "subdevice_online"):
+                    pass  # TODO: update device online status
+                elif msg["eventType"] in ("gateway_offline", "subdevice_offline"):
+                    pass  # TODO: update device offline status
+                else:
                     pass
             else:
                 _LOGGER.warning("[msg_callback, {}]msg_time:{}, msg_data:{}".format("unknow_message", msg_time, msg['data']))
@@ -517,6 +503,9 @@ class AiotManager:
         self, config_entry: ConfigEntry, entity_type: str, cls_list, async_add_entities
     ):
         """根据ConfigEntry创建Entity"""
+        # 缓存平台回调，用于后续动态添加实体
+        self._platform_callbacks[entity_type] = (cls_list, async_add_entities)
+
         devices = []
         for x in self._entries_devices[config_entry.entry_id]:
             for i in range(len(self._managed_devices[x].platforms)):
@@ -582,10 +571,145 @@ class AiotManager:
                     entities.append(instance)
         async_add_entities(entities, update_before_add=True)
 
+    def get_entry_platforms(self, entry_id: str) -> set:
+        """获取 entry 使用的所有平台类型"""
+        platforms = set()
+        for did in self._entries_devices.get(entry_id, []):
+            device = self._managed_devices.get(did)
+            if device and device.is_supported:
+                for p in device.platforms:
+                    platforms.update(p.keys())
+        return platforms
+
+    def clear_entry_state(self, entry_id: str):
+        """清理 entry 关联的所有设备/实体状态，用于 reload"""
+        device_ids = self._entries_devices.pop(entry_id, [])
+        for did in device_ids:
+            self._managed_devices.pop(did, None)
+            self._devices_entities.pop(did, None)
+        self._config_entries.pop(entry_id, None)
+        self._all_devices.clear()
+        self._platform_callbacks.clear()
+        _LOGGER.info("Cleared entry state for %s (%d devices)", entry_id, len(device_ids))
+
     async def async_remove_entry(self, config_entry):
-        """ConfigEntry remove."""
-        self._config_entries.pop(config_entry.entry_id)
-        device_ids = self._entries_devices[config_entry.entry_id]
-        for device_id in device_ids:
-            self._managed_devices.pop(device_id)
-            self._devices_entities.pop(device_id)
+        """ConfigEntry permanent remove."""
+        self.clear_entry_state(config_entry.entry_id)
+
+    async def async_add_device_entities(self, device: AiotDevice):
+        """为单个新设备通过缓存的平台回调创建实体"""
+        if not device.is_supported:
+            return
+        self._devices_entities.setdefault(device.did, [])
+        if not device.resource_names:
+            device.resource_names = await self._session.async_query_resource_name([device.did]) or []
+
+        for platform_type, (cls_list, add_callback) in self._platform_callbacks.items():
+            params = []
+            for aiot_device in AIOT_DEVICE_MAPPING:
+                if device.model in aiot_device:
+                    for p in aiot_device['params']:
+                        if platform_type in p:
+                            params.append(p[platform_type])
+                    break
+            if not params:
+                continue
+
+            ch_count = None
+            for j in range(len(params)):
+                if params[j].get(MK_MAPPING_PARAMS):
+                    ch_count = ch_count or params[j][MK_MAPPING_PARAMS].get("ch_count")
+
+            new_entities = []
+            if ch_count:
+                for i in range(ch_count):
+                    for j in range(len(params)):
+                        attr = params[j].get(MK_INIT_PARAMS)[MK_HASS_NAME]
+                        t = cls_list.get(attr) or cls_list['default']
+                        instance = t(
+                            self._hass, device, params[j][MK_RESOURCES],
+                            i + 1, **params[j].get(MK_INIT_PARAMS) or {},
+                        )
+                        self._devices_entities[device.did].append(instance)
+                        new_entities.append(instance)
+            else:
+                for i in range(len(params)):
+                    attr = params[i].get(MK_INIT_PARAMS)[MK_HASS_NAME]
+                    t = cls_list.get(attr) or cls_list['default']
+                    instance = t(
+                        self._hass, device, params[i][MK_RESOURCES],
+                        **params[i].get(MK_INIT_PARAMS) or {},
+                    )
+                    self._devices_entities[device.did].append(instance)
+                    new_entities.append(instance)
+
+            if new_entities:
+                add_callback(new_entities, update_before_add=True)
+                _LOGGER.info("Added %d %s entities for device %s (%s)",
+                             len(new_entities), platform_type, device.did, device.model)
+
+    async def async_refresh_and_discover(self):
+        """刷新设备列表并发现新设备（增量），用于手动刷新服务和 RocketMQ 事件"""
+        old_dids = set(self._managed_devices.keys())
+        await self.async_refresh_all_devices()
+
+        # 查找所有 entry 的 config_entry（通常只有一个）
+        config_entry = next(iter(self._config_entries.values()), None)
+        if not config_entry:
+            _LOGGER.warning("No config entry found for device discovery")
+            return
+
+        entry_id = config_entry.entry_id
+        new_count = 0
+        for device in self._all_devices.values():
+            if device.did in old_dids:
+                continue
+            if not device.is_supported:
+                continue
+            self._managed_devices[device.did] = device
+            self._entries_devices.setdefault(entry_id, []).append(device.did)
+            await self.async_add_device_entities(device)
+            new_count += 1
+
+        # 检测已移除的设备
+        current_dids = set(self._all_devices.keys())
+        removed_dids = old_dids - current_dids
+        for did in removed_dids:
+            self._remove_device(did)
+
+        if new_count > 0 or removed_dids:
+            _LOGGER.info("Device refresh: %d new, %d removed", new_count, len(removed_dids))
+
+    def _remove_device(self, did: str):
+        """移除单个设备及其实体"""
+        entities = self._devices_entities.pop(did, [])
+        if entities:
+            from homeassistant.helpers import entity_registry as er
+            registry = er.async_get(self._hass)
+            for entity in entities:
+                entry = registry.async_get(entity.entity_id)
+                if entry:
+                    registry.async_remove(entry.entity_id)
+                    _LOGGER.info("Removed entity %s", entry.entity_id)
+        self._managed_devices.pop(did, None)
+        self._all_devices.pop(did, None)
+        for entry_id, dids in self._entries_devices.items():
+            if did in dids:
+                dids.remove(did)
+
+    async def _handle_device_bind(self, msg):
+        """处理设备绑定事件，自动发现新设备"""
+        _LOGGER.info("Device bind event: %s", msg.get("eventType"))
+        if not self._platform_callbacks:
+            _LOGGER.warning("No platform callbacks cached, skipping auto-discovery")
+            return
+        await self.async_refresh_and_discover()
+
+    async def _handle_device_unbind(self, msg):
+        """处理设备解绑事件，移除实体"""
+        _LOGGER.info("Device unbind event: %s", msg.get("eventType"))
+        for data in msg.get("data", []):
+            did = data.get("did") or data.get("subjectId")
+            if did and did in self._managed_devices:
+                _LOGGER.info("Removing unbound device: %s", did)
+                self._remove_device(did)

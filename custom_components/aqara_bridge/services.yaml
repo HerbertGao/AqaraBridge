@@ -1,0 +1,3 @@
+refresh_devices:
+  name: Refresh Devices
+  description: Refresh the device list from Aqara Cloud. Discovers newly bound devices and removes unbound ones.

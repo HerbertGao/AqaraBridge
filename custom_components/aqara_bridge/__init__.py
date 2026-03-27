@@ -213,6 +213,14 @@ async def async_setup_entry(hass, entry):
     else:
         await manager.async_add_all_devices(entry)
 
+    # Register refresh_devices service
+    if not hass.services.has_service(DOMAIN, "refresh_devices"):
+        async def handle_refresh_devices(call):
+            _LOGGER.info("Manual device refresh triggered")
+            await manager.async_refresh_and_discover()
+
+        hass.services.async_register(DOMAIN, "refresh_devices", handle_refresh_devices)
+
     # Schedule proactive token refresh (no immediate refresh if token is fresh)
     _schedule_token_refresh(hass, entry, refresh_delay)
 
@@ -220,11 +228,26 @@ async def async_setup_entry(hass, entry):
 
 
 async def async_unload_entry(hass, entry):
+    manager: AiotManager = hass.data[DOMAIN][HASS_DATA_AIOT_MANAGER]
+
+    # Unload platforms
+    platforms = manager.get_entry_platforms(entry.entry_id)
+    if platforms:
+        await hass.config_entries.async_unload_platforms(entry, platforms)
+
+    # Clear entry state so reload triggers full re-initialization
+    manager.clear_entry_state(entry.entry_id)
+
     # Cancel proactive token refresh timer
     timer = hass.data[DOMAIN].get(HASS_DATA_REFRESH_TIMER)
     if timer is not None:
         timer.cancel()
         hass.data[DOMAIN].pop(HASS_DATA_REFRESH_TIMER, None)
+
+    # Unregister service if this is the last entry
+    if not hass.config_entries.async_entries(DOMAIN):
+        hass.services.async_remove(DOMAIN, "refresh_devices")
+
     return True
 
 
